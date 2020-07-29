@@ -84,6 +84,10 @@ var vehicle
 # Weapons
 var equipped_weapon
 
+# Dead
+var dead = false
+
+
 func _ready():
 	shape = get_node("shape")
 	
@@ -147,6 +151,8 @@ func _init():
 
 func _physics_process(delta):
 	if is_network_master():
+		if dead:
+			return
 		process_input(delta)
 		if !is_in_vehicle:
 			process_movement(delta)
@@ -154,6 +160,8 @@ func _physics_process(delta):
 		rpc("check_weapons")
 		
 func _input(event):
+	if dead:
+		return
 	if event is InputEventMouseMotion and Input.get_mouse_mode() == Input.MOUSE_MODE_CAPTURED:
 		get_node("camera_base").rotate_y(-event.relative.x * CAMERA_ROTATION_SPEED)
 		get_node("camera_base").orthonormalize()
@@ -162,6 +170,8 @@ func _input(event):
 		get_node("camera_base/rotation").rotation.x = camera_x_rot
 
 func process_input(delta):
+	if dead:
+		return
 	# Walking
 	dir = Vector3()
 	var cam_xform = get_node("camera_base/rotation/target/camera").global_transform
@@ -457,10 +467,17 @@ func play_random_footstep():
 	footsteps_player.stream = footsteps_concrete[randi() % footsteps_concrete.size()]
 	footsteps_player.play()
 
+remotesync func hit(damage, position):
+	hurt(damage)
+
+
 remotesync func hurt(damage):
 	set_health(health - damage)
 	voice_player.stream = pain_sound
 	voice_player.play()
+	if health < 0:
+		dead = true
+		hide()
 
 remotesync func die():
 	if !is_dead:
